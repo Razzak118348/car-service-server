@@ -34,13 +34,17 @@ async function run() {
       res.json(services);
     });
 
+
+
+
     app.get("/services/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
-      const options = {
-        projection: { title: 1, img: 1, price: 1, service_id: 1 },
-      };
-      const service = await servicerCollection.findOne(query, options);
+      // const options = {
+      //   projection: { title: 1, img: 1, price: 1, service_id: 1 },
+      // };
+      // const service = await servicerCollection.findOne(query, options);
+      const service = await servicerCollection.findOne(query);
       res.send(service);
     });
 
@@ -51,7 +55,48 @@ async function run() {
       res.json(result);
     });
 
-    app.get("/bookings", async (req, res) => {});
+    app.get("/bookings", async (req, res) => {
+      let query = {};
+      if (req.query?.email) {
+        query = { email: req.query.email };
+      }
+      const cursor = orderCollection.find(query);
+      const orders = await cursor.toArray();
+      res.json(orders);
+    });
+
+    app.get("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const order = await orderCollection.findOne(query);
+      res.json(order);
+    });
+
+    //update
+    app.patch("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const updateBooking = req.body;
+      console.log(updateBooking);
+      const query = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+
+      const updateDoc = {
+        $set: {
+          status: updateBooking.status,
+        },
+      };
+      const result = await orderCollection.updateOne(query, updateDoc, options);
+
+      res.json(result);
+    });
+
+    //delete
+    app.delete("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await orderCollection.deleteOne(query);
+      res.json(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
