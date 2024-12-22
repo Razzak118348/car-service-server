@@ -1,13 +1,21 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 3000;
 
 //middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
 const uri = `mongodb+srv://${process.env.DB_User}:${process.env.DB_password}@cluster0.kqp32.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -20,6 +28,27 @@ const client = new MongoClient(uri, {
   },
 });
 
+//middleware
+const verifyToken = async (req, res, next) => {
+  const token = req.cookies?.token;
+  console.log("value of token in middleware", token);
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    //err
+    if (err) {
+      console.log(err)
+      return res.status(403).send({ message: "Forbidden access" });
+    }
+    //if token is valid
+    console.log("value in the decoded", decoded);
+    req.user = decoded;
+    next();
+  });
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -28,15 +57,56 @@ async function run() {
     const servicerCollection = client.db("carService").collection("services");
     const orderCollection = client.db("carService").collection("orders");
 
+    //auth related api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      try {
+        const token = jwt.sign(
+          { email: user?.email },
+          process.env.ACCESS_TOKEN_SECRET,
+          {
+            expiresIn: "1h",
+          }
+        );
+        res.cookie("token", token, {
+          httpOnly: true,
+          maxAge: 900000,
+          secure: false,
+        });
+        console.log("Generated Token:", token); // Debugging
+
+        res.status(200).json({ token });
+      } catch (error) {
+        console.error("Error generating token:", error);
+        res.status(500).json({ message: "Token generation failed" });
+      }
+    });
+
+    app.get("/jwt", (req, res) => {
+      const token = req.cookies;
+      console.log(token); // Get the token from the cookies
+      if (!token) {
+        return res.status(401).json({ message: "No token provided" });
+      }
+
+      // jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      //   if (err) {
+      //     return res.status(403).json({ message: 'Invalid or expired token' });
+      //   }
+      //   res.status(200).json({ message: 'Token is valid', decoded });
+      // });
+      else {
+        res.send(token);
+      }
+    });
+
+    //services releted api
     app.get("/services", async (req, res) => {
       const cursor = servicerCollection.find();
       const services = await cursor.toArray();
       res.json(services);
     });
-
-
-
-
     app.get("/services/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -55,7 +125,9 @@ async function run() {
       res.json(result);
     });
 
-    app.get("/bookings", async (req, res) => {
+    app.get("/bookings", verifyToken, async (req, res) => {
+      console.log(req.query.email);
+console.log("user in the valid token :",req.user)
       let query = {};
       if (req.query?.email) {
         query = { email: req.query.email };
