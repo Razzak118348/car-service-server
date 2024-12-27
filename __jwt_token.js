@@ -23,3 +23,18 @@
 
 //to send cookies from the client make sure you added withCredentials: true in axios configeration.
 //use cookie-parser as middleware
+
+/**
+ * 1.jwt --> json web token
+ *2. generate a token by using jwt.sign()
+ *3.create api set to cookie. http only , secure, samesite
+ 4. from client side: axios withcredentials true
+ 5. cors setup origin and credentials
+
+
+ //1. for secure api calls
+ 2. install cookie parser and use it as a middleware
+ 3. req.cookies
+ 4. on the client make api call using axios withcredentials:true
+ 5.
+ */

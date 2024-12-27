@@ -39,7 +39,7 @@ const verifyToken = async (req, res, next) => {
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     //err
     if (err) {
-      console.log(err)
+      console.log(err);
       return res.status(403).send({ message: "Forbidden access" });
     }
     //if token is valid
@@ -60,45 +60,25 @@ async function run() {
     //auth related api
     app.post("/jwt", async (req, res) => {
       const user = req.body;
-      console.log(user);
-      try {
-        const token = jwt.sign(
-          { email: user?.email },
-          process.env.ACCESS_TOKEN_SECRET,
-          {
-            expiresIn: "1h",
-          }
-        );
-        res.cookie("token", token, {
-          httpOnly: true,
-          maxAge: 900000,
-          secure: false,
-        });
-        console.log("Generated Token:", token); // Debugging
+      console.log("user for login token", user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
 
-        res.status(200).json({ token });
-      } catch (error) {
-        console.error("Error generating token:", error);
-        res.status(500).json({ message: "Token generation failed" });
-      }
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+        })
+        .send({ success: true });
     });
 
-    app.get("/jwt", (req, res) => {
-      const token = req.cookies;
-      console.log(token); // Get the token from the cookies
-      if (!token) {
-        return res.status(401).json({ message: "No token provided" });
-      }
-
-      // jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-      //   if (err) {
-      //     return res.status(403).json({ message: 'Invalid or expired token' });
-      //   }
-      //   res.status(200).json({ message: 'Token is valid', decoded });
-      // });
-      else {
-        res.send(token);
-      }
+    //for null user or logout option
+    app.post("/logOut", async (req, res) => {
+      const user = req.body;
+      console.log("user for logout", user);
+      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
     });
 
     //services releted api
@@ -127,7 +107,15 @@ async function run() {
 
     app.get("/bookings", verifyToken, async (req, res) => {
       console.log(req.query.email);
-console.log("user in the valid token :",req.user)
+
+      console.log('cookies', req.cookies)
+
+      // if not same
+      if (req.query.email !== req.user.email) {
+        return res.status(403).json({ message: "forbidden access" });
+      }
+
+      //if same
       let query = {};
       if (req.query?.email) {
         query = { email: req.query.email };
