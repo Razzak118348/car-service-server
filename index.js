@@ -31,7 +31,8 @@ const client = new MongoClient(uri, {
 //middleware
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token;
-  console.log("value of token in middleware", token);
+  // console.log("value of token in middleware", token);
+  //no token
   if (!token) {
     return res.status(401).send({ message: "Unauthorized access" });
   }
@@ -108,14 +109,14 @@ async function run() {
     app.get("/bookings", verifyToken, async (req, res) => {
       console.log(req.query.email);
 
-      console.log('cookies', req.cookies)
+      // console.log('cookies', req.cookies)
+      // console.log("token woner info", req.user);
 
-      // if not same
-      if (req.query.email !== req.user.email) {
-        return res.status(403).json({ message: "forbidden access" });
+      //if request email is not same as user email
+      if (req.user.email !== req.query.email) {
+        return res.status(401).json({ message: "Unauthorized access" });
       }
-
-      //if same
+      //if both is  same
       let query = {};
       if (req.query?.email) {
         query = { email: req.query.email };

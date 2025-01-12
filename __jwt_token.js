@@ -35,6 +35,6 @@
  //1. for secure api calls
  2. install cookie parser and use it as a middleware
  3. req.cookies
- 4. on the client make api call using axios withcredentials:true
+ 4. on the client make api call using axios withcredentials:true ;
  5.
  */
