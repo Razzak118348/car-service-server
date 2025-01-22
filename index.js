@@ -28,7 +28,7 @@ const client = new MongoClient(uri, {
   },
 });
 
-//middleware
+//middleware make this for use multiple time to secure multiple api
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token;
   // console.log("value of token in middleware", token);
@@ -66,8 +66,173 @@ async function run() {
         expiresIn: "1h",
       });
 
-      res
-        .cookie("token", token, {
+
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' }),
+  ],
+});
+
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.simple(),
+  }));
+}
+
+// middleware
+app.use((req, res, next) => {
+  logger.info(`Request: ${req.method} ${req.url}`);
+  next();
+});
+
+// auth related api
+app.post("/jwt", async (req, res) => {
+  try {
+    const user = req.body;
+    logger.info(`Login attempt: ${user.email}`);
+    const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+      expiresIn: "1h",
+    });
+    logger.info(`Token generated for: ${user.email}`);
+    res
+      .cookie("token", token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      })
+      .send({ success: true });
+  } catch (error) {
+    logger.error(`Error generating token: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+// for null user or logout option
+app.post("/logOut", async (req, res) => {
+  try {
+    const user = req.body;
+    logger.info(`Logout attempt: ${user.email}`);
+    res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+  } catch (error) {
+    logger.error(`Error logging out: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+// services related api
+app.get("/services", async (req, res) => {
+  try {
+    logger.info(`Fetching services`);
+    const cursor = servicerCollection.find();
+    const services = await cursor.toArray();
+    logger.info(`Services fetched successfully`);
+    res.json(services);
+  } catch (error) {
+    logger.error(`Error fetching services: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/services/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    logger.info(`Fetching service: ${id}`);
+    const query = { _id: new ObjectId(id) };
+    const service = await servicerCollection.findOne(query);
+    logger.info(`Service fetched successfully: ${id}`);
+    res.send(service);
+  } catch (error) {
+    logger.error(`Error fetching service: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+// order
+app.post("/bookings", async (req, res) => {
+  try {
+    const order = req.body;
+    logger.info(`Booking attempt: ${order.email}`);
+    const result = await orderCollection.insertOne(order);
+    logger.info(`Booking successful: ${order.email}`);
+    res.json(result);
+  } catch (error) {
+    logger.error(`Error booking: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/bookings", verifyToken, async (req, res) => {
+  try {
+    logger.info(`Fetching bookings for: ${req.query.email}`);
+    const query = {};
+    if (req.query?.email) {
+      query = { email: req.query.email };
+    }
+    const cursor = orderCollection.find(query);
+    const orders = await cursor.toArray();
+    logger.info(`Bookings fetched successfully for: ${req.query.email}`);
+    res.json(orders);
+  } catch (error) {
+    logger.error(`Error fetching bookings: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/bookings/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    logger.info(`Fetching booking: ${id}`);
+    const query = { _id: new ObjectId(id) };
+    const order = await orderCollection.findOne(query);
+    logger.info(`Booking fetched successfully: ${id}`);
+    res.json(order);
+  } catch (error) {
+    logger.error(`Error fetching booking: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+// update
+app.patch("/bookings/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    logger.info(`Updating booking: ${id}`);
+    const updateBooking = req.body;
+    const query = { _id: new ObjectId(id) };
+    const options = { upsert: true };
+    const updateDoc = {
+      $set: {
+        status: updateBooking.status,
+      },
+    };
+    const result = await orderCollection.updateOne(query, updateDoc, options);
+    logger.info(`Booking updated successfully: ${id}`);
+    res.json(result);
+  } catch (error) {
+    logger.error(`Error updating booking: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
+// delete
+app.delete("/bookings/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    logger.info(`Deleting booking: ${id}`);
+    const query = { _id: new ObjectId(id) };
+    const result = await orderCollection.deleteOne(query);
+    logger.info(`Booking deleted successfully: ${id}`);
+    res.json(result);
+  } catch (error) {
+    logger.error(`Error deleting booking: ${error.message}`);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+        res.cookie("token", token, {
           httpOnly: true,
           secure: true,
           sameSite: "none",
